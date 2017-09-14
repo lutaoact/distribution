@@ -1,5 +1,3 @@
-// +build include_kodo
-
 package kodo
 
 import (
@@ -8,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 )
 
 type TransportWithLogger struct {

@@ -4,13 +4,11 @@
 // Because KODO is a key, value store the Stat call does not support last modification
 // time for directories (directories are an abstraction for key, value stores)
 //
-// +build include_kodo
 
 package kodo
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -20,12 +18,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 
 	"qiniupkg.com/api.v7/auth/qbox"
 	"qiniupkg.com/api.v7/kodo"
 	"qiniupkg.com/x/rpc.v7"
 
+	"github.com/docker/distribution/context"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/registry/storage/driver/base"
 	"github.com/docker/distribution/registry/storage/driver/factory"
@@ -117,7 +116,12 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 	params.Config.RSHost = getParameter(parameters, "rshost")
 	params.Config.RSFHost = getParameter(parameters, "rsfhost")
 	params.Config.IoHost = getParameter(parameters, "iohost")
-	params.Config.UpHosts, _ = parameters["uphosts"].([]string)
+	uphosts, ok := parameters["uphosts"].([]interface{})
+	if ok {
+		for _, a := range uphosts {
+			params.Config.UpHosts = append(params.Config.UpHosts, a.(string))
+		}
+	}
 
 	params.Config.Transport = NewTransportWithLogger()
 
@@ -135,6 +139,7 @@ type Driver struct {
 func New(params DriverParameters) (*Driver, error) {
 
 	client := kodo.New(params.Zone, &params.Config)
+	logrus.Info("kodo.config", params.Config)
 	bucket := client.Bucket(params.Bucket)
 	refresh := qbox.NewClient(qbox.NewMac(params.AdminAk, params.AdminSk), params.Config.Transport)
 
