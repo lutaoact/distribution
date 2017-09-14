@@ -1,5 +1,3 @@
-// +build include_kodo
-
 package kodo
 
 import (
