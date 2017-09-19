@@ -443,12 +443,12 @@ func (d *driver) URLFor(ctx context.Context, path string, options map[string]int
 			if strings.Contains(host, key) {
 				baseURL = val + d.getKey(path)
 				url := d.client.MakePrivateUrl(baseURL, &policy)
-				logrus.Debug("URLFor ", key, val)
+				logrus.Info("URLFor ", key, val)
 				return url, nil
 			}
 		}
 	}
-	logrus.Debug("URLFor ", options["host"])
+	logrus.Info("URLFor ", options["host"])
 	baseURL = d.params.BaseURL + d.getKey(path)
 	url := d.client.MakePrivateUrl(baseURL, &policy)
 	return url, nil
