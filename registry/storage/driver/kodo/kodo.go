@@ -42,10 +42,11 @@ type DriverParameters struct {
 	RootDirectory string
 	kodo.Config
 
-	UserUid    uint64
-	AdminAk    string
-	AdminSk    string
-	RefreshURL string
+	UserUid     uint64
+	AdminAk     string
+	AdminSk     string
+	RefreshURL  string
+	RedirectMap map[string]string
 }
 
 func init() {
@@ -122,8 +123,20 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 			params.Config.UpHosts = append(params.Config.UpHosts, a.(string))
 		}
 	}
+	redirect, ok := parameters["redirect"].([]interface{})
+	params.RedirectMap = make(map[string]string, 0)
+	if ok {
+		for _, a := range redirect {
+			keyval := strings.Split(a.(string), "::")
+			if len(keyval) == 2 {
+				params.RedirectMap[keyval[0]] = keyval[1]
+			}
+		}
+	}
 
 	params.Config.Transport = NewTransportWithLogger()
+
+	logrus.Info("kodo.config", params)
 
 	return New(params)
 }
@@ -139,7 +152,6 @@ type Driver struct {
 func New(params DriverParameters) (*Driver, error) {
 
 	client := kodo.New(params.Zone, &params.Config)
-	logrus.Info("kodo.config", params.Config)
 	bucket := client.Bucket(params.Bucket)
 	refresh := qbox.NewClient(qbox.NewMac(params.AdminAk, params.AdminSk), params.Config.Transport)
 
@@ -417,7 +429,7 @@ func (d *driver) Delete(ctx context.Context, path string) error {
 // May return an ErrUnsupportedMethod in certain StorageDriver
 // implementations.
 func (d *driver) URLFor(ctx context.Context, path string, options map[string]interface{}) (string, error) {
-
+	var baseURL string
 	policy := kodo.GetPolicy{Expires: defaultExpiry}
 
 	if expiresTime, ok := options["expiry"].(time.Time); ok {
@@ -426,7 +438,18 @@ func (d *driver) URLFor(ctx context.Context, path string, options map[string]int
 		}
 	}
 
-	baseURL := d.params.BaseURL + d.getKey(path)
+	if host, ok := options["host"].(string); ok {
+		for key, val := range d.params.RedirectMap {
+			if strings.Contains(host, key) {
+				baseURL = val + d.getKey(path)
+				url := d.client.MakePrivateUrl(baseURL, &policy)
+				logrus.Debug("URLFor ", key, val)
+				return url, nil
+			}
+		}
+	}
+	logrus.Debug("URLFor ", options["host"])
+	baseURL = d.params.BaseURL + d.getKey(path)
 	url := d.client.MakePrivateUrl(baseURL, &policy)
 	return url, nil
 }
