@@ -209,6 +209,7 @@ func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
 
 	body, err := ioutil.ReadAll(rc)
 	if err != nil {
+		logrus.Errorln("debugkodo GetContent", err)
 		return nil, err
 	}
 	return body, nil
@@ -220,8 +221,13 @@ func (d *driver) PutContent(ctx context.Context, path string, content []byte) er
 
 	err := d.bucket.Put(ctx, nil, d.getKey(path), bytes.NewBuffer(content), int64(len(content)), nil)
 	if err == nil {
-		return d.refreshCache(d.getKey(path))
+		err1 := d.refreshCache(d.getKey(path))
+		if err1 != nil {
+			logrus.Errorln("debugkodo refreshCache", err1)
+		}
+		return err1
 	}
+	logrus.Errorln("debugkodo PutContent", err)
 	return err
 }
 
@@ -236,6 +242,7 @@ func (d *driver) Reader(ctx context.Context, path string, offset int64) (io.Read
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
+		logrus.Errorln("debugkodo Reader", err)
 		return nil, err
 	}
 	if offset > 0 {
@@ -244,6 +251,7 @@ func (d *driver) Reader(ctx context.Context, path string, offset int64) (io.Read
 
 	resp, err := d.client.Do(ctx, req)
 	if err != nil {
+		logrus.Errorln("debugkodo reader do req", err)
 		return nil, err
 	}
 
@@ -265,6 +273,7 @@ func (d *driver) Writer(ctx context.Context, path string, append bool) (storaged
 		if err != nil {
 			pathNotFoundErr := storagedriver.PathNotFoundError{Path: path, DriverName: driverName}
 			if err != pathNotFoundErr {
+				logrus.Errorln("debugkodo Writer", err)
 				return nil, err
 			}
 		} else {
@@ -278,9 +287,10 @@ func (d *driver) Writer(ctx context.Context, path string, append bool) (storaged
 // size in bytes and the creation time.
 func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo, error) {
 
-	items, _, _, err := d.bucket.List(ctx, d.getKey(path), "", "", 1)
+	items, _, _, err := bucketlistWithRetry(d.bucket, ctx, d.getKey(path), "", "", 1)
 	if err != nil {
 		if err != io.EOF {
+			logrus.Errorln("debugkodo Stat", err)
 			return nil, err
 		}
 		err = nil
@@ -306,6 +316,20 @@ func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo,
 	}
 
 	return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
+}
+
+func bucketlistWithRetry(b *kodo.Bucket, ctx context.Context, prefix, delimiter, marker string, limit int) (entries []kodo.ListItem, commonPrefixes []string, markerOut string, err error) {
+	for i := 0; i < 2; i++ {
+		entries, commonPrefixes, markerOut, err = b.List(ctx, prefix, delimiter, marker, limit)
+		if err != nil {
+			if err1, ok := err.(*rpc.ErrorInfo); ok && err1.Code == 599 {
+				logrus.Infoln("bucketlistWithRetry triggered")
+				continue
+			}
+		}
+		break
+	}
+	return
 }
 
 // List returns a list of the objects that are direct descendants of the
@@ -337,9 +361,10 @@ func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 	)
 
 	for {
-		items, prefixes, marker, err = d.bucket.List(ctx, d.getKey(path), "/", marker, listMax)
+		items, prefixes, marker, err = bucketlistWithRetry(d.bucket, ctx, d.getKey(path), "/", marker, listMax)
 		if err != nil {
 			if err != io.EOF {
+				logrus.Errorln("debugkodo bucketlistWithRetry", err)
 				return nil, err
 			}
 			err = nil
@@ -374,6 +399,9 @@ func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) error {
 
 	err := d.bucket.Move(ctx, d.getKey(sourcePath), d.getKey(destPath), true)
+	if err != nil {
+		logrus.Errorln("debugkodo Move", err)
+	}
 	return parseError(sourcePath, err)
 }
 
@@ -389,9 +417,10 @@ func (d *driver) Delete(ctx context.Context, path string) error {
 	)
 
 	for {
-		items, _, marker, err = d.bucket.List(ctx, d.getKey(path), "", marker, listMax)
+		items, _, marker, err = bucketlistWithRetry(d.bucket, ctx, d.getKey(path), "", marker, listMax)
 		if err != nil {
 			if err != io.EOF {
+				logrus.Errorln("debugkodo Delete bucketlistWithRetry", err)
 				return err
 			}
 			err = nil
@@ -443,12 +472,12 @@ func (d *driver) URLFor(ctx context.Context, path string, options map[string]int
 			if strings.Contains(host, key) {
 				baseURL = val + d.getKey(path)
 				url := d.client.MakePrivateUrl(baseURL, &policy)
-				logrus.Debug("URLFor ", key, val)
+				logrus.Info("URLFor ", key, val)
 				return url, nil
 			}
 		}
 	}
-	logrus.Debug("URLFor ", options["host"])
+	logrus.Info("URLFor ", options["host"])
 	baseURL = d.params.BaseURL + d.getKey(path)
 	url := d.client.MakePrivateUrl(baseURL, &policy)
 	return url, nil
@@ -524,6 +553,7 @@ func (w *writer) Write(p []byte) (n int, err error) {
 
 	if w.err != nil {
 		err = w.err
+		logrus.Errorln("debugkodo writer Write ", err)
 		return
 	}
 
@@ -531,9 +561,9 @@ func (w *writer) Write(p []byte) (n int, err error) {
 		w.rd, w.wt = io.Pipe()
 		go w.background()
 	}
-
 	n, err = w.wt.Write(p)
 	if err != nil {
+		logrus.Errorln("debugkodo writer wt.Write ", err)
 		return
 	}
 	w.size += int64(n)
@@ -547,6 +577,7 @@ func (w *writer) Close() error {
 
 	w.close()
 	if w.err != nil {
+		logrus.Errorln("debugkodo writer close ", w.err)
 		return w.err
 	}
 
@@ -556,6 +587,10 @@ func (w *writer) Close() error {
 
 // Size returns the number of bytes written to this FileWriter.
 func (w *writer) Size() int64 {
+	debugLog(fmt.Sprintf("getting size : %d %v", w.size, w.closed))
+	// if !w.closed {
+	// 	return w.size + w.bufferd
+	// }
 	return w.size
 }
 
@@ -571,6 +606,9 @@ func (w *writer) Cancel() error {
 
 	w.cancelled = true
 	err := w.Delete(w.ctx, w.path)
+	if err != nil {
+		logrus.Errorln("debugkodo writer cancel ", w.err)
+	}
 	return err
 }
 
@@ -588,6 +626,7 @@ func (w *writer) Commit() error {
 
 	w.close()
 	if w.err != nil {
+		logrus.Errorln("debugkodo writer Commit ", w.err)
 		return w.err
 	}
 
@@ -596,6 +635,7 @@ func (w *writer) Commit() error {
 }
 
 func (w *writer) close() {
+	debugLog(fmt.Sprintf("closing with size : %d", w.size))
 	if w.wt != nil {
 		w.wt.CloseWithError(io.EOF)
 		w.wt = nil
@@ -606,12 +646,26 @@ func (w *writer) close() {
 	}
 }
 
+func debugLog(header string) {
+	// pc := make([]uintptr, 8, 8)
+	// cnt := runtime.Callers(1, pc)
+	logrus.Infoln(header)
+	// for i := 0; i < cnt; i++ {
+	// 	fu := runtime.FuncForPC(pc[i] - 1)
+
+	// 	file, line := fu.FileLine(pc[i] - 1)
+	// 	logrus.Infoln(fmt.Sprintf("%s:%d", filepath.Base(file), line))
+	// }
+	return
+}
+
 func (w *writer) background() {
 	key := w.getKey(w.path)
 	parts := make([]kodo.PutPart, 0, 2)
 
 	defer func() {
 		w.exitch <- struct{}{}
+		debugLog(fmt.Sprintf("background close, size : %d", w.size))
 	}()
 
 	if w.from > 0 {
