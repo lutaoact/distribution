@@ -227,7 +227,7 @@ func (d *driver) PutContent(ctx context.Context, path string, content []byte) er
 		}
 		return err1
 	}
-	logrus.Errorln("debugkodo PutContent", err)
+	logrus.Errorln("debugkodo PutContent", errorInfo(err))
 	return err
 }
 
@@ -251,7 +251,7 @@ func (d *driver) Reader(ctx context.Context, path string, offset int64) (io.Read
 
 	resp, err := d.client.Do(ctx, req)
 	if err != nil {
-		logrus.Errorln("debugkodo reader do req", err)
+		logrus.Errorln("debugkodo reader do req", errorInfo(err))
 		return nil, err
 	}
 
@@ -273,7 +273,7 @@ func (d *driver) Writer(ctx context.Context, path string, append bool) (storaged
 		if err != nil {
 			pathNotFoundErr := storagedriver.PathNotFoundError{Path: path, DriverName: driverName}
 			if err != pathNotFoundErr {
-				logrus.Errorln("debugkodo Writer", err)
+				logrus.Errorln("debugkodo Writer", errorInfo(err))
 				return nil, err
 			}
 		} else {
@@ -290,7 +290,7 @@ func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo,
 	items, _, _, err := bucketlistWithRetry(d.bucket, ctx, d.getKey(path), "", "", 1)
 	if err != nil {
 		if err != io.EOF {
-			logrus.Errorln("debugkodo Stat", err)
+			logrus.Errorln("debugkodo Stat", errorInfo(err))
 			return nil, err
 		}
 		err = nil
@@ -323,7 +323,7 @@ func bucketlistWithRetry(b *kodo.Bucket, ctx context.Context, prefix, delimiter,
 		entries, commonPrefixes, markerOut, err = b.List(ctx, prefix, delimiter, marker, limit)
 		if err != nil {
 			if err1, ok := err.(*rpc.ErrorInfo); ok && err1.Code == 599 {
-				logrus.Infoln("bucketlistWithRetry triggered")
+				logrus.Infoln("bucketlistWithRetry triggered", errorInfo(err))
 				continue
 			}
 		}
@@ -364,7 +364,7 @@ func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 		items, prefixes, marker, err = bucketlistWithRetry(d.bucket, ctx, d.getKey(path), "/", marker, listMax)
 		if err != nil {
 			if err != io.EOF {
-				logrus.Errorln("debugkodo bucketlistWithRetry", err)
+				logrus.Errorln("debugkodo bucketlistWithRetry", errorInfo(err))
 				return nil, err
 			}
 			err = nil
@@ -400,7 +400,7 @@ func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) e
 
 	err := d.bucket.Move(ctx, d.getKey(sourcePath), d.getKey(destPath), true)
 	if err != nil {
-		logrus.Errorln("debugkodo Move", err)
+		logrus.Errorln("debugkodo Move", errorInfo(err))
 	}
 	return parseError(sourcePath, err)
 }
@@ -420,7 +420,7 @@ func (d *driver) Delete(ctx context.Context, path string) error {
 		items, _, marker, err = bucketlistWithRetry(d.bucket, ctx, d.getKey(path), "", marker, listMax)
 		if err != nil {
 			if err != io.EOF {
-				logrus.Errorln("debugkodo Delete bucketlistWithRetry", err)
+				logrus.Errorln("debugkodo Delete bucketlistWithRetry", errorInfo(err))
 				return err
 			}
 			err = nil
@@ -553,7 +553,7 @@ func (w *writer) Write(p []byte) (n int, err error) {
 
 	if w.err != nil {
 		err = w.err
-		logrus.Errorln("debugkodo writer Write ", err)
+		logrus.Errorln("debugkodo writer Write ", errorInfo(err))
 		return
 	}
 
@@ -563,7 +563,7 @@ func (w *writer) Write(p []byte) (n int, err error) {
 	}
 	n, err = w.wt.Write(p)
 	if err != nil {
-		logrus.Errorln("debugkodo writer wt.Write ", err)
+		logrus.Errorln("debugkodo writer wt.Write ", errorInfo(err))
 		return
 	}
 	w.size += int64(n)
@@ -577,7 +577,7 @@ func (w *writer) Close() error {
 
 	w.close()
 	if w.err != nil {
-		logrus.Errorln("debugkodo writer close ", w.err)
+		logrus.Errorln("debugkodo writer close ", errorInfo(w.err))
 		return w.err
 	}
 
@@ -607,13 +607,13 @@ func (w *writer) Cancel() error {
 	w.cancelled = true
 	err := w.Delete(w.ctx, w.path)
 	if err != nil {
-		logrus.Errorln("debugkodo writer cancel ", w.err)
+		logrus.Errorln("debugkodo writer cancel ", errorInfo(w.err))
 	}
 	return err
 }
 
 // Commit flushes all content written to this FileWriter and makes it
-// available for future calls to StorageDriver.GetContent and
+// available for future calls to StorageDriver./ and
 // StorageDriver.Reader.
 func (w *writer) Commit() error {
 	if w.closed {
@@ -626,7 +626,7 @@ func (w *writer) Commit() error {
 
 	w.close()
 	if w.err != nil {
-		logrus.Errorln("debugkodo writer Commit ", w.err)
+		logrus.Errorln("debugkodo writer Commit ", errorInfo(w.err))
 		return w.err
 	}
 
@@ -682,13 +682,13 @@ func (w *writer) background() {
 
 	w.err = w.bucket.PutParts(w.ctx, nil, key, []string{key}, parts, nil)
 	if w.err != nil {
-		logrus.Warn("writer background PutParts:", key, w.err)
+		logrus.Warn("writer background PutParts:", key, errorInfo(w.err))
 		return
 	}
 
 	w.err = w.refreshCache(key)
 	if w.err != nil {
-		logrus.Warn("writer background refreshCache:", key, w.err)
+		logrus.Warn("writer background refreshCache:", key, errorInfo(w.err))
 		return
 	}
 }
@@ -714,4 +714,11 @@ func getParameter(parameters map[string]interface{}, key string) (value string) 
 		value = fmt.Sprint(v)
 	}
 	return
+}
+
+func errorInfo(err error) string {
+	if err1, ok := err.(*rpc.ErrorInfo); ok {
+		return err1.ErrorDetail()
+	}
+	return err.Error()
 }
