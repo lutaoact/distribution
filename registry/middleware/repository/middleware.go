@@ -3,8 +3,8 @@ package middleware
 import (
 	"fmt"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/context"
+	"github.com/kirk-enterprise/distribution"
+	"github.com/kirk-enterprise/distribution/context"
 )
 
 // InitFunc is the type of a RepositoryMiddleware factory function and is

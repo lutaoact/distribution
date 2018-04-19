@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/docker/distribution"
-	ctxu "github.com/docker/distribution/context"
-	"github.com/docker/distribution/digest"
-	"github.com/docker/distribution/registry/api/errcode"
-	"github.com/docker/distribution/registry/api/v2"
-	"github.com/docker/distribution/registry/auth"
+	"github.com/kirk-enterprise/distribution"
+	ctxu "github.com/kirk-enterprise/distribution/context"
+	"github.com/kirk-enterprise/distribution/digest"
+	"github.com/kirk-enterprise/distribution/registry/api/errcode"
+	"github.com/kirk-enterprise/distribution/registry/api/v2"
+	"github.com/kirk-enterprise/distribution/registry/auth"
 	"golang.org/x/net/context"
 )
 

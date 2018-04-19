@@ -3,13 +3,13 @@ package testutil
 import (
 	"fmt"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/digest"
-	"github.com/docker/distribution/manifest"
-	"github.com/docker/distribution/manifest/manifestlist"
-	"github.com/docker/distribution/manifest/schema1"
-	"github.com/docker/distribution/manifest/schema2"
+	"github.com/kirk-enterprise/distribution"
+	"github.com/kirk-enterprise/distribution/context"
+	"github.com/kirk-enterprise/distribution/digest"
+	"github.com/kirk-enterprise/distribution/manifest"
+	"github.com/kirk-enterprise/distribution/manifest/manifestlist"
+	"github.com/kirk-enterprise/distribution/manifest/schema1"
+	"github.com/kirk-enterprise/distribution/manifest/schema2"
 	"github.com/docker/libtrust"
 )
 

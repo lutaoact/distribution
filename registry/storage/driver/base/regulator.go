@@ -4,8 +4,8 @@ import (
 	"io"
 	"sync"
 
-	"github.com/docker/distribution/context"
-	storagedriver "github.com/docker/distribution/registry/storage/driver"
+	"github.com/kirk-enterprise/distribution/context"
+	storagedriver "github.com/kirk-enterprise/distribution/registry/storage/driver"
 )
 
 type regulator struct {

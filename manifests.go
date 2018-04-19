@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"mime"
 
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/digest"
+	"github.com/kirk-enterprise/distribution/context"
+	"github.com/kirk-enterprise/distribution/digest"
 )
 
 // Manifest represents a registry object specifying a set of

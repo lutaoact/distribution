@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/distribution/digest"
+	"github.com/kirk-enterprise/distribution/digest"
 )
 
 func TestReferenceParse(t *testing.T) {
@@ -100,7 +100,7 @@ func TestReferenceParse(t *testing.T) {
 			err:   ErrNameContainsUppercase,
 		},
 		// FIXME "Uppercase" is incorrectly handled as a domain-name here, therefore passes.
-		// See https://github.com/docker/distribution/pull/1778, and https://github.com/docker/docker/pull/20175
+		// See https://github.com/kirk-enterprise/distribution/pull/1778, and https://github.com/docker/docker/pull/20175
 		//{
 		//	input: "Uppercase/lowercase:tag",
 		//	err:   ErrNameContainsUppercase,

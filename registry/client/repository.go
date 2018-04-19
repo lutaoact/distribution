@@ -13,14 +13,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/digest"
-	"github.com/docker/distribution/reference"
-	"github.com/docker/distribution/registry/api/v2"
-	"github.com/docker/distribution/registry/client/transport"
-	"github.com/docker/distribution/registry/storage/cache"
-	"github.com/docker/distribution/registry/storage/cache/memory"
+	"github.com/kirk-enterprise/distribution"
+	"github.com/kirk-enterprise/distribution/context"
+	"github.com/kirk-enterprise/distribution/digest"
+	"github.com/kirk-enterprise/distribution/reference"
+	"github.com/kirk-enterprise/distribution/registry/api/v2"
+	"github.com/kirk-enterprise/distribution/registry/client/transport"
+	"github.com/kirk-enterprise/distribution/registry/storage/cache"
+	"github.com/kirk-enterprise/distribution/registry/storage/cache/memory"
 )
 
 // Registry provides an interface for calling Repositories, which returns a catalog of repositories.

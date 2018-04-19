@@ -4,7 +4,7 @@ import (
 	"expvar"
 	"sync/atomic"
 
-	"github.com/docker/distribution/registry/storage/cache"
+	"github.com/kirk-enterprise/distribution/registry/storage/cache"
 )
 
 type blobStatCollector struct {

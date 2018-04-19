@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/distribution/registry/client/auth/challenge"
-	"github.com/docker/distribution/registry/client/transport"
-	"github.com/docker/distribution/testutil"
+	"github.com/kirk-enterprise/distribution/registry/client/auth/challenge"
+	"github.com/kirk-enterprise/distribution/registry/client/transport"
+	"github.com/kirk-enterprise/distribution/testutil"
 )
 
 // An implementation of clock for providing fake time data.

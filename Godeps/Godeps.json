@@ -1,5 +1,5 @@
 {
-	"ImportPath": "github.com/docker/distribution",
+	"ImportPath": "github.com/kirk-enterprise/distribution",
 	"GoVersion": "go1.6",
 	"GodepVersion": "v74",
 	"Packages": [
@@ -12,12 +12,12 @@
 			"Rev": "0b5fe2abe0271ba07049eacaa65922d67c319543"
 		},
 		{
-			"ImportPath": "github.com/Sirupsen/logrus",
+			"ImportPath": "github.com/sirupsen/logrus",
 			"Comment": "v0.7.3",
 			"Rev": "55eb11d21d2a31a3cc93838241d04800f52e823d"
 		},
 		{
-			"ImportPath": "github.com/Sirupsen/logrus/formatters/logstash",
+			"ImportPath": "github.com/sirupsen/logrus/formatters/logstash",
 			"Comment": "v0.7.3",
 			"Rev": "55eb11d21d2a31a3cc93838241d04800f52e823d"
 		},

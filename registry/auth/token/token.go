@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/docker/libtrust"
 
-	"github.com/docker/distribution/registry/auth"
+	"github.com/kirk-enterprise/distribution/registry/auth"
 )
 
 const (

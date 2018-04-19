@@ -5,8 +5,8 @@ import (
 	"io"
 	"net/http"
 
-	ctxu "github.com/docker/distribution/context"
-	"github.com/docker/distribution/registry/api/errcode"
+	ctxu "github.com/kirk-enterprise/distribution/context"
+	"github.com/kirk-enterprise/distribution/registry/api/errcode"
 )
 
 // closeResources closes all the provided resources after running the target

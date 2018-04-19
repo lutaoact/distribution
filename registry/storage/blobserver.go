@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/digest"
-	"github.com/docker/distribution/registry/storage/driver"
+	"github.com/kirk-enterprise/distribution"
+	"github.com/kirk-enterprise/distribution/context"
+	"github.com/kirk-enterprise/distribution/digest"
+	"github.com/kirk-enterprise/distribution/registry/storage/driver"
 )
 
 // TODO(stevvooe): This should configurable in the future.

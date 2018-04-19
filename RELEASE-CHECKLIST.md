@@ -2,7 +2,7 @@
 
 10. Compile release notes detailing features and since the last release.  Update the `CHANGELOG.md` file.
 
-20. Update the version file: `https://github.com/docker/distribution/blob/master/version/version.go`
+20. Update the version file: `https://github.com/kirk-enterprise/distribution/blob/master/version/version.go`
 
 30. Update the `MAINTAINERS` (if necessary), `AUTHORS` and `.mailmap` files.
 
@@ -17,9 +17,9 @@ You will need PGP installed and a PGP key which has been added to your Github ac
 
 50. Push the signed tag
 
-60. Create a new [release](https://github.com/docker/distribution/releases).  In the case of a release candidate, tick the `pre-release` checkbox. 
+60. Create a new [release](https://github.com/kirk-enterprise/distribution/releases).  In the case of a release candidate, tick the `pre-release` checkbox. 
 
-70. Update the registry binary in [distribution library image repo](https://github.com/docker/distribution-library-image) by running the update script and  opening a pull request.
+70. Update the registry binary in [distribution library image repo](https://github.com/kirk-enterprise/distribution-library-image) by running the update script and  opening a pull request.
 
 80. Update the official image.  Add the new version in the [official images repo](https://github.com/docker-library/official-images) by appending a new version to the `registry/registry` file with the git hash pointed to by the signed tag.  Update the major version to point to the latest version and the minor version to point to new patch release if necessary.
 e.g. to release `2.3.1`

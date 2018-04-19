@@ -3,11 +3,11 @@ package memory
 import (
 	"sync"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/digest"
-	"github.com/docker/distribution/reference"
-	"github.com/docker/distribution/registry/storage/cache"
+	"github.com/kirk-enterprise/distribution"
+	"github.com/kirk-enterprise/distribution/context"
+	"github.com/kirk-enterprise/distribution/digest"
+	"github.com/kirk-enterprise/distribution/reference"
+	"github.com/kirk-enterprise/distribution/registry/storage/cache"
 )
 
 type inMemoryBlobDescriptorCacheProvider struct {

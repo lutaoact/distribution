@@ -7,12 +7,12 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/digest"
+	"github.com/kirk-enterprise/distribution"
+	"github.com/kirk-enterprise/distribution/context"
+	"github.com/kirk-enterprise/distribution/digest"
 
-	"github.com/docker/distribution/reference"
-	"github.com/docker/distribution/testutil"
+	"github.com/kirk-enterprise/distribution/reference"
+	"github.com/kirk-enterprise/distribution/testutil"
 )
 
 func TestLinkedBlobStoreCreateWithMountFrom(t *testing.T) {

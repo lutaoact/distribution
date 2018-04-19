@@ -1,8 +1,8 @@
 package distribution
 
 import (
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/reference"
+	"github.com/kirk-enterprise/distribution/context"
+	"github.com/kirk-enterprise/distribution/reference"
 )
 
 // Scope defines the set of items that match a namespace.

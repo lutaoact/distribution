@@ -3,10 +3,10 @@ package notifications
 import (
 	"net/http"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/digest"
-	"github.com/docker/distribution/reference"
+	"github.com/kirk-enterprise/distribution"
+	"github.com/kirk-enterprise/distribution/context"
+	"github.com/kirk-enterprise/distribution/digest"
+	"github.com/kirk-enterprise/distribution/reference"
 )
 
 // ManifestListener describes a set of methods for listening to events related to manifests.

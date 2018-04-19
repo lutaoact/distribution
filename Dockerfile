@@ -1,6 +1,6 @@
 FROM golang:1.7-alpine
 
-ENV DISTRIBUTION_DIR /go/src/github.com/docker/distribution
+ENV DISTRIBUTION_DIR /go/src/github.com/kirk-enterprise/distribution
 ENV DOCKER_BUILDTAGS include_oss include_gcs
 
 RUN set -ex \

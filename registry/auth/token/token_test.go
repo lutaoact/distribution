@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/registry/auth"
+	"github.com/kirk-enterprise/distribution/context"
+	"github.com/kirk-enterprise/distribution/registry/auth"
 	"github.com/docker/libtrust"
 )
 

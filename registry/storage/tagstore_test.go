@@ -3,10 +3,10 @@ package storage
 import (
 	"testing"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/reference"
-	"github.com/docker/distribution/registry/storage/driver/inmemory"
+	"github.com/kirk-enterprise/distribution"
+	"github.com/kirk-enterprise/distribution/context"
+	"github.com/kirk-enterprise/distribution/reference"
+	"github.com/kirk-enterprise/distribution/registry/storage/driver/inmemory"
 )
 
 type tagsTestEnv struct {

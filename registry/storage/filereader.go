@@ -8,8 +8,8 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/docker/distribution/context"
-	storagedriver "github.com/docker/distribution/registry/storage/driver"
+	"github.com/kirk-enterprise/distribution/context"
+	storagedriver "github.com/kirk-enterprise/distribution/registry/storage/driver"
 )
 
 // TODO(stevvooe): Set an optimal buffer size here. We'll have to

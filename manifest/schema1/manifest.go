@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/digest"
-	"github.com/docker/distribution/manifest"
+	"github.com/kirk-enterprise/distribution"
+	"github.com/kirk-enterprise/distribution/digest"
+	"github.com/kirk-enterprise/distribution/manifest"
 	"github.com/docker/libtrust"
 )
 

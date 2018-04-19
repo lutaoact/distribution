@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"encoding/json"
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/digest"
-	"github.com/docker/distribution/manifest/manifestlist"
+	"github.com/kirk-enterprise/distribution"
+	"github.com/kirk-enterprise/distribution/context"
+	"github.com/kirk-enterprise/distribution/digest"
+	"github.com/kirk-enterprise/distribution/manifest/manifestlist"
 )
 
 // manifestListHandler is a ManifestHandler that covers schema2 manifest lists.

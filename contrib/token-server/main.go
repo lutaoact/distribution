@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Sirupsen/logrus"
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/registry/api/errcode"
-	"github.com/docker/distribution/registry/auth"
-	_ "github.com/docker/distribution/registry/auth/htpasswd"
+	"github.com/sirupsen/logrus"
+	"github.com/kirk-enterprise/distribution/context"
+	"github.com/kirk-enterprise/distribution/registry/api/errcode"
+	"github.com/kirk-enterprise/distribution/registry/auth"
+	_ "github.com/kirk-enterprise/distribution/registry/auth/htpasswd"
 	"github.com/docker/libtrust"
 	"github.com/gorilla/mux"
 )

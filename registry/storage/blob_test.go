@@ -11,13 +11,13 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/digest"
-	"github.com/docker/distribution/reference"
-	"github.com/docker/distribution/registry/storage/cache/memory"
-	"github.com/docker/distribution/registry/storage/driver/testdriver"
-	"github.com/docker/distribution/testutil"
+	"github.com/kirk-enterprise/distribution"
+	"github.com/kirk-enterprise/distribution/context"
+	"github.com/kirk-enterprise/distribution/digest"
+	"github.com/kirk-enterprise/distribution/reference"
+	"github.com/kirk-enterprise/distribution/registry/storage/cache/memory"
+	"github.com/kirk-enterprise/distribution/registry/storage/driver/testdriver"
+	"github.com/kirk-enterprise/distribution/testutil"
 )
 
 // TestWriteSeek tests that the current file size can be

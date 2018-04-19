@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/docker/distribution/reference"
+	"github.com/kirk-enterprise/distribution/reference"
 )
 
 type urlBuilderTestCase struct {

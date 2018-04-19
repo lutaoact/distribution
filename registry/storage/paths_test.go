@@ -3,7 +3,7 @@ package storage
 import (
 	"testing"
 
-	"github.com/docker/distribution/digest"
+	"github.com/kirk-enterprise/distribution/digest"
 )
 
 func TestPathMapper(t *testing.T) {

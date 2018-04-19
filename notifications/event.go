@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/docker/distribution"
+	"github.com/kirk-enterprise/distribution"
 )
 
 // EventAction constants used in action field of Event.

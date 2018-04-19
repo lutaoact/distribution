@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/docker/distribution/configuration"
+	"github.com/kirk-enterprise/distribution/configuration"
 )
 
 // Tests to ensure nextProtos returns the correct protocols when:

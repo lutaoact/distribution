@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/docker/distribution/context"
-	storagedriver "github.com/docker/distribution/registry/storage/driver"
-	storagemiddleware "github.com/docker/distribution/registry/storage/driver/middleware"
+	"github.com/kirk-enterprise/distribution/context"
+	storagedriver "github.com/kirk-enterprise/distribution/registry/storage/driver"
+	storagemiddleware "github.com/kirk-enterprise/distribution/registry/storage/driver/middleware"
 )
 
 type redirectStorageMiddleware struct {

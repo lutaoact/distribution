@@ -40,8 +40,8 @@ package base
 import (
 	"io"
 
-	"github.com/docker/distribution/context"
-	storagedriver "github.com/docker/distribution/registry/storage/driver"
+	"github.com/kirk-enterprise/distribution/context"
+	storagedriver "github.com/kirk-enterprise/distribution/registry/storage/driver"
 )
 
 // Base provides a wrapper around a storagedriver implementation that provides

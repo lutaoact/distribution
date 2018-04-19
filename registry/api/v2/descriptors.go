@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/docker/distribution/digest"
-	"github.com/docker/distribution/reference"
-	"github.com/docker/distribution/registry/api/errcode"
+	"github.com/kirk-enterprise/distribution/digest"
+	"github.com/kirk-enterprise/distribution/reference"
+	"github.com/kirk-enterprise/distribution/registry/api/errcode"
 )
 
 var (

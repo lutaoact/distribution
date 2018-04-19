@@ -7,8 +7,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/docker/distribution/digest"
-	"github.com/docker/distribution/version"
+	"github.com/kirk-enterprise/distribution/digest"
+	"github.com/kirk-enterprise/distribution/version"
 )
 
 var (

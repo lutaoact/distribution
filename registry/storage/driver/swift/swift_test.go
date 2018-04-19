@@ -10,9 +10,9 @@ import (
 
 	"github.com/ncw/swift/swifttest"
 
-	"github.com/docker/distribution/context"
-	storagedriver "github.com/docker/distribution/registry/storage/driver"
-	"github.com/docker/distribution/registry/storage/driver/testsuites"
+	"github.com/kirk-enterprise/distribution/context"
+	storagedriver "github.com/kirk-enterprise/distribution/registry/storage/driver"
+	"github.com/kirk-enterprise/distribution/registry/storage/driver/testsuites"
 
 	"gopkg.in/check.v1"
 )

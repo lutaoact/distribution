@@ -10,9 +10,9 @@ import (
 
 	"qiniupkg.com/api.v7/kodo"
 
-	"github.com/docker/distribution/context"
-	storagedriver "github.com/docker/distribution/registry/storage/driver"
-	"github.com/docker/distribution/registry/storage/driver/testsuites"
+	"github.com/kirk-enterprise/distribution/context"
+	storagedriver "github.com/kirk-enterprise/distribution/registry/storage/driver"
+	"github.com/kirk-enterprise/distribution/registry/storage/driver/testsuites"
 )
 
 // Hook up gocheck into the "go test" runner.

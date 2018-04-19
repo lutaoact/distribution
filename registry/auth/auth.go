@@ -37,7 +37,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/docker/distribution/context"
+	"github.com/kirk-enterprise/distribution/context"
 )
 
 const (

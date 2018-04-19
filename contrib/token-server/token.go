@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/registry/auth"
-	"github.com/docker/distribution/registry/auth/token"
+	"github.com/kirk-enterprise/distribution/context"
+	"github.com/kirk-enterprise/distribution/registry/auth"
+	"github.com/kirk-enterprise/distribution/registry/auth/token"
 	"github.com/docker/libtrust"
 )
 

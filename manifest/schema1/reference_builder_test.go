@@ -3,10 +3,10 @@ package schema1
 import (
 	"testing"
 
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/digest"
-	"github.com/docker/distribution/manifest"
-	"github.com/docker/distribution/reference"
+	"github.com/kirk-enterprise/distribution/context"
+	"github.com/kirk-enterprise/distribution/digest"
+	"github.com/kirk-enterprise/distribution/manifest"
+	"github.com/kirk-enterprise/distribution/reference"
 	"github.com/docker/libtrust"
 )
 

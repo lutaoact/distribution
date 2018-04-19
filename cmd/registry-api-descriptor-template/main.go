@@ -20,8 +20,8 @@ import (
 	"regexp"
 	"text/template"
 
-	"github.com/docker/distribution/registry/api/errcode"
-	"github.com/docker/distribution/registry/api/v2"
+	"github.com/kirk-enterprise/distribution/registry/api/errcode"
+	"github.com/kirk-enterprise/distribution/registry/api/v2"
 )
 
 var spaceRegex = regexp.MustCompile(`\n\s*`)

@@ -1,10 +1,10 @@
 package cache
 
 import (
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/digest"
+	"github.com/kirk-enterprise/distribution/context"
+	"github.com/kirk-enterprise/distribution/digest"
 
-	"github.com/docker/distribution"
+	"github.com/kirk-enterprise/distribution"
 )
 
 // Metrics is used to hold metric counters

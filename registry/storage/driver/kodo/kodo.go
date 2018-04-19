@@ -18,16 +18,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"qiniupkg.com/api.v7/auth/qbox"
 	"qiniupkg.com/api.v7/kodo"
 	"qiniupkg.com/x/rpc.v7"
 
-	"github.com/docker/distribution/context"
-	storagedriver "github.com/docker/distribution/registry/storage/driver"
-	"github.com/docker/distribution/registry/storage/driver/base"
-	"github.com/docker/distribution/registry/storage/driver/factory"
+	"github.com/kirk-enterprise/distribution/context"
+	storagedriver "github.com/kirk-enterprise/distribution/registry/storage/driver"
+	"github.com/kirk-enterprise/distribution/registry/storage/driver/base"
+	"github.com/kirk-enterprise/distribution/registry/storage/driver/factory"
 )
 
 const driverName = "kodo"

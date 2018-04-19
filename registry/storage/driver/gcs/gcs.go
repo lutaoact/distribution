@@ -37,12 +37,12 @@ import (
 	"google.golang.org/cloud"
 	"google.golang.org/cloud/storage"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
-	ctx "github.com/docker/distribution/context"
-	storagedriver "github.com/docker/distribution/registry/storage/driver"
-	"github.com/docker/distribution/registry/storage/driver/base"
-	"github.com/docker/distribution/registry/storage/driver/factory"
+	ctx "github.com/kirk-enterprise/distribution/context"
+	storagedriver "github.com/kirk-enterprise/distribution/registry/storage/driver"
+	"github.com/kirk-enterprise/distribution/registry/storage/driver/base"
+	"github.com/kirk-enterprise/distribution/registry/storage/driver/factory"
 )
 
 const (
