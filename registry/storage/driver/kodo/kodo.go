@@ -9,19 +9,21 @@ package kodo
 
 import (
 	"bytes"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"os"
+	pathlib "path"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 
-	"qiniupkg.com/api.v7/auth/qbox"
-	"qiniupkg.com/api.v7/kodo"
+	"github.com/qiniu/api.v7/auth/qbox"
+	"github.com/qiniu/api.v7/storage"
 	"qiniupkg.com/x/rpc.v7"
 
 	"github.com/docker/distribution/context"
@@ -31,114 +33,72 @@ import (
 )
 
 const driverName = "kodo"
-const listMax = 1000
-const defaultExpiry = 3600
+
+var mac *qbox.Mac
+var BUCKET string
 
 // DriverParameters A struct that encapsulates all of the driver parameters after all values have been set
-type DriverParameters struct {
-	Zone          int
-	Bucket        string
-	BaseURL       string
-	RootDirectory string
-	kodo.Config
-
-	UserUid     uint64
-	AdminAk     string
-	AdminSk     string
-	RefreshURL  string
-	RedirectMap map[string]string
-}
-
 func init() {
 	factory.Register(driverName, &kodoDriverFactory{})
 }
 
-type kodoDriverFactory struct {
-}
+type kodoDriverFactory struct{}
 
 func (factory *kodoDriverFactory) Create(parameters map[string]interface{}) (storagedriver.StorageDriver, error) {
 	return FromParameters(parameters)
 }
 
+type DriverParameters struct {
+	Bucket        string
+	BaseURL       string
+	BaseHost      string
+	AccessKey     string
+	SecretKey     string
+	RootDirectory string
+	Zone          *storage.Zone
+	IsInternal    bool
+}
+
 func FromParameters(parameters map[string]interface{}) (*Driver, error) {
+	bucket := parameters["bucket"].(string)
+	baseurl := parameters["baseurl"].(string)
+	accesskey := parameters["accesskey"].(string)
+	secretkey := parameters["secretkey"].(string)
+	rootdirectory := parameters["rootdirectory"].(string)
+	isinternal := parameters["isinternal"].(bool)
 
-	var err error
-
-	params := DriverParameters{}
-
-	params.Zone, _ = parameters["zone"].(int)
-
-	params.Bucket = getParameter(parameters, "bucket")
-	if params.Bucket == "" {
-		return nil, fmt.Errorf("No bucket parameter provided")
-	}
-
-	params.BaseURL = getParameter(parameters, "baseurl")
-	if params.BaseURL == "" {
-		return nil, fmt.Errorf("No baseurl parameter provided")
-	}
-
-	params.Config.AccessKey = getParameter(parameters, "accesskey")
-	if params.Config.AccessKey == "" {
-		return nil, fmt.Errorf("No accesskey parameter provided")
-	}
-
-	params.Config.SecretKey = getParameter(parameters, "secretkey")
-	if params.Config.SecretKey == "" {
-		return nil, fmt.Errorf("No secretkey parameter provided")
-	}
-
-	params.AdminAk = getParameter(parameters, "adminaccesskey")
-	if params.AdminAk == "" {
-		return nil, fmt.Errorf("No adminaccesskey parameter provided")
-	}
-
-	params.AdminSk = getParameter(parameters, "adminsecretkey")
-	if params.AdminSk == "" {
-		return nil, fmt.Errorf("No adminsecretkey parameter provided")
-	}
-
-	userUid := getParameter(parameters, "useruid")
-	if userUid == "" {
-		return nil, fmt.Errorf("No useruid parameter provided")
-	}
-	params.UserUid, err = strconv.ParseUint(userUid, 10, 64)
+	// 解析出baseurl对应的host，后面在配置内网访问时需要用到
+	u, err := url.Parse(baseurl)
 	if err != nil {
-		return nil, fmt.Errorf("useruid format err: %v", err)
+		logrus.Fatal("illegal baseurl:", baseurl)
+		return nil, err
+	}
+	basehost := u.Host
+
+	// 配置内网加速的iohost和uphost，这两个配置在测试环境没用
+	zone := &storage.ZoneHuadong
+	if iohost, ok := parameters["iohost"].(string); ok && len(iohost) > 0 {
+		zone.IovipHost = iohost
 	}
 
-	params.RefreshURL = getParameter(parameters, "refreshurl")
-	if params.RefreshURL == "" {
-		return nil, fmt.Errorf("No refreshurl parameter provided")
-	}
-
-	params.RootDirectory = getParameter(parameters, "rootdirectory")
-
-	params.Config.RSHost = getParameter(parameters, "rshost")
-	params.Config.RSFHost = getParameter(parameters, "rsfhost")
-	params.Config.IoHost = getParameter(parameters, "iohost")
-	uphosts, ok := parameters["uphosts"].([]interface{})
-	if ok {
-		for _, a := range uphosts {
-			params.Config.UpHosts = append(params.Config.UpHosts, a.(string))
+	if uphosts, ok := parameters["uphosts"].([]interface{}); ok && len(uphosts) > 0 {
+		srcUpHosts := make([]string, len(uphosts))
+		for i, host := range uphosts {
+			srcUpHosts[i] = host.(string)
 		}
-	}
-	redirect, ok := parameters["redirect"].([]interface{})
-	params.RedirectMap = make(map[string]string, 0)
-	if ok {
-		for _, a := range redirect {
-			keyval := strings.Split(a.(string), "::")
-			if len(keyval) == 2 {
-				params.RedirectMap[keyval[0]] = keyval[1]
-			}
-		}
+		zone.SrcUpHosts = srcUpHosts
 	}
 
-	params.Config.Transport = NewTransportWithLogger()
-
-	logrus.Info("kodo.config", params)
-
-	return New(params)
+	return New(&DriverParameters{
+		Bucket:        bucket,
+		BaseURL:       baseurl,
+		BaseHost:      basehost,
+		AccessKey:     accesskey,
+		SecretKey:     secretkey,
+		RootDirectory: rootdirectory,
+		Zone:          zone,
+		IsInternal:    isinternal,
+	})
 }
 
 type baseEmbed struct {
@@ -149,28 +109,23 @@ type Driver struct {
 	baseEmbed
 }
 
-func New(params DriverParameters) (*Driver, error) {
+func New(params *DriverParameters) (*Driver, error) {
+	mac = qbox.NewMac(params.AccessKey, params.SecretKey)
 
-	client := kodo.New(params.Zone, &params.Config)
-	bucket := client.Bucket(params.Bucket)
-	refresh := qbox.NewClient(qbox.NewMac(params.AdminAk, params.AdminSk), params.Config.Transport)
+	BUCKET = params.Bucket
 
-	params.RootDirectory = strings.TrimRight(params.RootDirectory, "/")
-
-	if !strings.HasSuffix(params.BaseURL, "/") {
-		params.BaseURL += "/"
+	cfg := storage.Config{
+		UseHTTPS: false,
+		Zone:     params.Zone,
 	}
+
+	uploader := storage.NewResumeUploader(&cfg)
+	bucketManager := storage.NewBucketManager(mac, &cfg)
 
 	d := &driver{
-		params:    params,
-		client:    client,
-		bucket:    &bucket,
-		refresh:   refresh,
-		refreshCh: make(chan string, 100),
-	}
-
-	for i := 0; i < 10; i++ {
-		go d.refreshWorker()
+		params:        params,
+		uploader:      uploader,
+		bucketManager: bucketManager,
 	}
 
 	return &Driver{
@@ -183,11 +138,9 @@ func New(params DriverParameters) (*Driver, error) {
 }
 
 type driver struct {
-	params    DriverParameters
-	bucket    *kodo.Bucket
-	client    *kodo.Client
-	refresh   *http.Client
-	refreshCh chan string
+	params        *DriverParameters
+	uploader      *storage.ResumeUploader
+	bucketManager *storage.BucketManager
 }
 
 // Name returns the human-readable "name" of the driver, useful in error
@@ -200,144 +153,191 @@ func (d *driver) Name() string {
 // GetContent retrieves the content stored at "path" as a []byte.
 // This should primarily be used for small objects.
 func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
+	logger := ReqEntry(ctx).WithFields(logrus.Fields{
+		"path": path, "func": "GetContent",
+	})
 
 	rc, err := d.Reader(ctx, path, 0)
 	if err != nil {
+		logger.Error("Reader:", err)
 		return nil, err
 	}
 	defer rc.Close()
 
 	body, err := ioutil.ReadAll(rc)
 	if err != nil {
-		logrus.Errorln("debugkodo GetContent", err)
+		logger.Error("ReadAll:", err)
 		return nil, err
 	}
 	return body, nil
-}
-
-// PutContent stores the []byte content at a location designated by "path".
-// This should primarily be used for small objects.
-func (d *driver) PutContent(ctx context.Context, path string, content []byte) error {
-
-	err := d.bucket.Put(ctx, nil, d.getKey(path), bytes.NewBuffer(content), int64(len(content)), nil)
-	if err == nil {
-		err1 := d.refreshCache(d.getKey(path))
-		if err1 != nil {
-			logrus.Errorln("debugkodo refreshCache", err1)
-		}
-		return err1
-	}
-	logrus.Errorln("debugkodo PutContent", errorInfo(err))
-	return err
 }
 
 // Reader retrieves an io.ReadCloser for the content stored at "path"
 // with a given byte offset.
 // May be used to resume reading a stream by providing a nonzero offset.
 func (d *driver) Reader(ctx context.Context, path string, offset int64) (io.ReadCloser, error) {
+	logger := ReqEntry(ctx).WithFields(logrus.Fields{
+		"path": path, "func": "Reader", "offset": offset,
+	})
 
-	policy := kodo.GetPolicy{Expires: defaultExpiry}
-	baseURL := d.params.BaseURL + d.getKey(path)
-	url := d.client.MakePrivateUrl(baseURL, &policy)
+	privateAccessURL := d.privateURL(path)
 
-	req, err := http.NewRequest("GET", url, nil)
+	// 转换为内网加速下载模式，这是kodo的黑科技
+	// 1. 将privateAccessURL中的域名部分替换为内网域名xsio.qiniu.io
+	// 2. http header中设置Host: [BaseURL 对应的域名]
+
+	// 这是配置加速的第一步
+	if d.params.IsInternal {
+		privateAccessURL = strings.Replace(
+			privateAccessURL, d.params.BaseHost, d.params.Zone.IovipHost, 1,
+		)
+	}
+
+	req, err := http.NewRequest("GET", privateAccessURL, nil)
 	if err != nil {
-		logrus.Errorln("debugkodo Reader", err)
+		logger.Error("http.NewRequest:", err)
 		return nil, err
 	}
+
 	if offset > 0 {
-		req.Header.Add("Range", "bytes="+strconv.FormatInt(offset, 10)+"-")
+		req.Header.Set("Range", "bytes="+strconv.FormatInt(offset, 10)+"-")
 	}
 
-	resp, err := d.client.Do(ctx, req)
+	// 这是配置加速的第二步
+	if d.params.IsInternal {
+		req.Host = d.params.BaseHost
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		logrus.Errorln("debugkodo reader do req", errorInfo(err))
+		logger.Error("http.Do:", err)
 		return nil, err
 	}
 
 	if resp.StatusCode == http.StatusNotFound {
 		resp.Body.Close()
+		logger.Warn("404: not found")
 		return nil, storagedriver.PathNotFoundError{Path: path, DriverName: driverName}
 	}
 
 	return resp.Body, nil
 }
 
+// PutContent stores the []byte content at a location designated by "path".
+// This should primarily be used for small objects.
+func (d *driver) PutContent(ctx context.Context, path string, content []byte) error {
+	logger := ReqEntry(ctx).WithFields(logrus.Fields{
+		"path": path, "func": "PutContent",
+	})
+
+	writer, err := d.Writer(ctx, path, false)
+	if err != nil {
+		logger.Error("d.Writer:", err)
+		return err
+	}
+	defer writer.Close()
+
+	_, err = io.Copy(writer, bytes.NewReader(content))
+	if err != nil {
+		writer.Cancel()
+		logger.Error("io.Copy:", err)
+		return err
+	}
+	return writer.Commit()
+}
+
 // Writer returns a FileWriter which will store the content written to it
 // at the location designated by "path" after the call to Commit.
+// 先将文件写入临时文件中，在Commit的时候在分片上传进入kodo
 func (d *driver) Writer(ctx context.Context, path string, append bool) (storagedriver.FileWriter, error) {
+	kodoKey := d.kodoKey(path)
+	fullPath := buildTmpPath(path)
+
+	logger := ReqEntry(ctx).WithFields(logrus.Fields{
+		"path": path, "func": "Writer", "append": append,
+	})
+
+	parentDir := pathlib.Dir(fullPath)
+	if err := os.MkdirAll(parentDir, 0777); err != nil {
+		return nil, err
+	}
+
+	fp, err := os.OpenFile(fullPath, os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		logger.Error("OpenFile:", err)
+		return nil, err
+	}
 
 	var offset int64
-	if append {
-		stat, err := d.Stat(ctx, path)
+	if !append {
+		err := fp.Truncate(0)
 		if err != nil {
-			pathNotFoundErr := storagedriver.PathNotFoundError{Path: path, DriverName: driverName}
-			if err != pathNotFoundErr {
-				logrus.Errorln("debugkodo Writer", errorInfo(err))
-				return nil, err
-			}
-		} else {
-			offset = stat.Size()
+			fp.Close()
+			return nil, err
 		}
+	} else {
+		n, err := fp.Seek(0, os.SEEK_END)
+		if err != nil {
+			fp.Close()
+			return nil, err
+		}
+		offset = int64(n)
 	}
-	return newFileWriter(d, ctx, path, offset), nil
+	logger.WithField("offset", offset).Info()
+
+	return newFileWriter(d, ctx, fp, kodoKey, offset), nil
 }
 
 // Stat retrieves the FileInfo for the given path, including the current
 // size in bytes and the creation time.
 func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo, error) {
+	logger := ReqEntry(ctx).WithFields(logrus.Fields{
+		"path": path, "func": "Stat",
+	})
 
-	items, _, _, err := bucketlistWithRetry(d.bucket, ctx, d.getKey(path), "", "", 1)
+	//只列出一个文件来查看，所以limit字段传1
+	limit := 1      //每次最多list 1000个文件
+	delimiter := "" //目录分隔符
+	marker := ""    //初始列举marker为空
+
+	entries, _, _, _, err := d.bucketManager.ListFiles(BUCKET, d.kodoKey(path), delimiter, marker, limit)
 	if err != nil {
-		if err != io.EOF {
-			logrus.Errorln("debugkodo Stat", errorInfo(err))
-			return nil, err
-		}
-		err = nil
+		logger.Error("ListFiles:", d.kodoKey(path), err)
+		return nil, err
 	}
 
-	if len(items) == 0 {
+	if len(entries) == 0 {
 		return nil, storagedriver.PathNotFoundError{Path: path, DriverName: driverName}
 	}
 
-	item := items[0]
+	entry := entries[0]
 
 	fi := storagedriver.FileInfoFields{
 		Path: path,
 	}
 
-	if d.getKey(path) != item.Key {
+	if d.kodoKey(path) != entry.Key {
 		fi.IsDir = true
 	}
 
 	if !fi.IsDir {
-		fi.Size = item.Fsize
-		fi.ModTime = time.Unix(0, item.PutTime*100)
+		fi.Size = entry.Fsize
+		fi.ModTime = time.Unix(0, entry.PutTime*100)
 	}
 
 	return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
 }
 
-func bucketlistWithRetry(b *kodo.Bucket, ctx context.Context, prefix, delimiter, marker string, limit int) (entries []kodo.ListItem, commonPrefixes []string, markerOut string, err error) {
-	for i := 0; i < 2; i++ {
-		entries, commonPrefixes, markerOut, err = b.List(ctx, prefix, delimiter, marker, limit)
-		if err != nil {
-			if err1, ok := err.(*rpc.ErrorInfo); ok && err1.Code == 599 {
-				logrus.Infoln("bucketlistWithRetry triggered", errorInfo(err))
-				continue
-			}
-		}
-		break
-	}
-	return
-}
-
+// registry要求所有的文件路径都是绝对路径，以"/"开头
 // List returns a list of the objects that are direct descendants of the
 // given path.
+// 这里的path参数应该是带前缀的"/" TODO
 func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
+	logger := ReqEntry(ctx).WithFields(logrus.Fields{
+		"path": opath, "func": "List",
+	})
 
 	path := opath
-
 	if path != "/" && path[len(path)-1] != '/' {
 		path += "/"
 	}
@@ -346,39 +346,36 @@ func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 	// In those cases, there is no root prefix to replace and we must actually add a "/" to all
 	// results in order to keep them as valid paths as recognized by storagedriver.PathRegexp
 	rootPrefix := ""
-	if d.getKey("") == "" {
+	if d.kodoKey("") == "" {
 		rootPrefix = "/"
 	}
 
-	var (
-		items    []kodo.ListItem
-		marker   string
-		prefixes []string
-		err      error
+	limit := 1000    //每次最多list 1000个文件
+	delimiter := "/" //目录分隔符
+	marker := ""     //初始列举marker为空
 
-		files       []string
-		directories []string
-	)
+	var files []string
+	var directories []string
 
 	for {
-		items, prefixes, marker, err = bucketlistWithRetry(d.bucket, ctx, d.getKey(path), "/", marker, listMax)
+		entries, prefixes, nextMarker, hasNext, err := d.bucketManager.ListFiles(BUCKET, d.kodoKey(path), delimiter, marker, limit)
+
 		if err != nil {
-			if err != io.EOF {
-				logrus.Errorln("debugkodo bucketlistWithRetry", errorInfo(err))
-				return nil, err
-			}
-			err = nil
+			logger.Error("bucketManager.ListFiles:", d.kodoKey(path), err)
+			return nil, err
 		}
 
-		for _, item := range items {
-			files = append(files, strings.Replace(item.Key, d.getKey(""), rootPrefix, 1))
+		for _, entry := range entries {
+			files = append(files, strings.Replace(entry.Key, d.kodoKey(""), rootPrefix, 1))
 		}
 
 		for _, prefix := range prefixes {
-			directories = append(directories, strings.Replace(strings.TrimSuffix(prefix, "/"), d.getKey(""), rootPrefix, 1))
+			directories = append(directories, strings.Replace(strings.TrimSuffix(prefix, "/"), d.kodoKey(""), rootPrefix, 1))
 		}
 
-		if marker == "" {
+		if hasNext {
+			marker = nextMarker
+		} else {
 			break
 		}
 	}
@@ -397,55 +394,57 @@ func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 // Note: This may be no more efficient than a copy followed by a delete for
 // many implementations.
 func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) error {
+	logger := ReqEntry(ctx).WithFields(logrus.Fields{
+		"sourcePath": sourcePath,
+		"destPath":   destPath,
+		"func":       "Move",
+	})
 
-	err := d.bucket.Move(ctx, d.getKey(sourcePath), d.getKey(destPath), true)
+	bucket := d.params.Bucket
+	err := d.bucketManager.Move(bucket, d.kodoKey(sourcePath), bucket, d.kodoKey(destPath), true)
 	if err != nil {
-		logrus.Errorln("debugkodo Move", errorInfo(err))
+		logger.Error("debugkodo Move:", errorInfo(err))
 	}
 	return parseError(sourcePath, err)
 }
 
 // Delete recursively deletes all objects stored at "path" and its subpaths.
 func (d *driver) Delete(ctx context.Context, path string) error {
+	logger := ReqEntry(ctx).WithFields(logrus.Fields{
+		"path": path, "func": "Delete",
+	})
 
-	var (
-		items  []kodo.ListItem
-		marker string
-		err    error
-
-		cnt int
-	)
+	bucket := d.params.Bucket
+	limit := 1000 //每次最多list 1000个文件
+	marker := ""  //初始列举marker为空
 
 	for {
-		items, _, marker, err = bucketlistWithRetry(d.bucket, ctx, d.getKey(path), "", marker, listMax)
+		entries, _, nextMarker, hasNext, err := d.bucketManager.ListFiles(bucket, d.kodoKey(path), "", marker, limit)
 		if err != nil {
-			if err != io.EOF {
-				logrus.Errorln("debugkodo Delete bucketlistWithRetry", errorInfo(err))
-				return err
-			}
-			err = nil
+			logger.Error("ListFiles:", d.kodoKey(path), err)
+			return err
 		}
 
-		cnt += len(items)
-		if cnt == 0 {
+		if len(entries) == 0 {
+			logger.Error("ListFiles:", d.kodoKey(path), "no entry")
 			return storagedriver.PathNotFoundError{Path: path, DriverName: driverName}
 		}
 
-		for _, item := range items {
-			err = d.bucket.Delete(ctx, item.Key)
+		for _, entry := range entries {
+			err = d.bucketManager.Delete(bucket, entry.Key)
 			if err != nil {
 				if isKeyNotExists(err) {
+					logger.Error("Delete:", d.kodoKey(path), " does not exist")
 					continue
 				}
-				return err
-			}
-			err = d.refreshCache(item.Key)
-			if err != nil {
+				logger.Error("Delete:", d.kodoKey(path), err)
 				return err
 			}
 		}
 
-		if marker == "" {
+		if hasNext {
+			marker = nextMarker
+		} else {
 			break
 		}
 	}
@@ -458,239 +457,61 @@ func (d *driver) Delete(ctx context.Context, path string) error {
 // May return an ErrUnsupportedMethod in certain StorageDriver
 // implementations.
 func (d *driver) URLFor(ctx context.Context, path string, options map[string]interface{}) (string, error) {
-	var baseURL string
-	policy := kodo.GetPolicy{Expires: defaultExpiry}
-
-	if expiresTime, ok := options["expiry"].(time.Time); ok {
-		if expires := expiresTime.Unix() - time.Now().Unix(); expires > 0 {
-			policy.Expires = uint32(expires)
-		}
-	}
-
-	if host, ok := options["host"].(string); ok {
-		for key, val := range d.params.RedirectMap {
-			if strings.Contains(host, key) {
-				baseURL = val + d.getKey(path)
-				url := d.client.MakePrivateUrl(baseURL, &policy)
-				logrus.Info("URLFor ", key, val)
-				return url, nil
-			}
-		}
-	}
-	logrus.Info("URLFor ", options["host"])
-	baseURL = d.params.BaseURL + d.getKey(path)
-	url := d.client.MakePrivateUrl(baseURL, &policy)
-	return url, nil
+	fmt.Printf("options = %+v\n", options)
+	return d.privateURL(path), nil
 }
 
-func (d *driver) refreshCache(key string) (err error) {
-	// async
-	d.refreshCh <- key
-	// sync
-	// err = d.refreshCacheNow(key)
-	return
+func (d *driver) privateURL(path string) string {
+	domain := d.params.BaseURL
+	key := d.kodoKey(path)
+	deadline := time.Now().Add(time.Second * 3600 * 3).Unix() //3小时有效期
+	privateAccessURL := storage.MakePrivateURL(mac, domain, key, deadline)
+
+	return privateAccessURL
 }
 
-func (d *driver) refreshCacheNow(key string) (err error) {
-	memcacheKey := "io:" + strconv.FormatUint(uint64(d.params.UserUid), 36) + ":" + d.params.Bucket + ":" + key
-	encodedKey := base64.URLEncoding.EncodeToString([]byte(memcacheKey))
-	resp, err := d.refresh.Get(d.params.RefreshURL + "/" + encodedKey)
+func (d *driver) upload(ctx context.Context, localFile, kodoKey string) error {
+	logger := ReqEntry(ctx).WithFields(logrus.Fields{
+		"kodoKey": kodoKey, "func": "upload",
+	})
+
+	putPolicy := storage.PutPolicy{
+		Scope:   fmt.Sprintf("%s:%s", BUCKET, kodoKey), //覆盖上传
+		Expires: 3600 * 3,                              //token过期时间 3小时
+	}
+	upToken := putPolicy.UploadToken(mac)
+
+	fileInfo, err := os.Stat(localFile)
 	if err != nil {
-		logrus.Error("refresh failed:", encodedKey, err)
-		return
-	}
-	resp.Body.Close()
-	return
-}
-
-func (d *driver) refreshWorker() {
-	for key := range d.refreshCh {
-		d.refreshCacheNow(key)
-	}
-}
-
-func (d *driver) getKey(path string) string {
-	return strings.TrimLeft(d.params.RootDirectory+path, "/")
-}
-
-// writer provides an abstraction for an opened writable file-like object in
-// the storage backend. The writer must flush all content written to it on
-// the call to Close, but is only required to make its content readable on a
-// call to Commit.
-type writer struct {
-	*driver
-	ctx  context.Context
-	path string
-
-	rd   *io.PipeReader
-	wt   *io.PipeWriter
-	size int64
-	from int64
-
-	closed    bool
-	committed bool
-	cancelled bool
-
-	exitch chan struct{}
-	err    error
-}
-
-func newFileWriter(d *driver, ctx context.Context, path string, size int64) storagedriver.FileWriter {
-	return &writer{
-		driver: d, ctx: ctx, path: path, from: size, size: size,
-		exitch: make(chan struct{}, 1),
-	}
-}
-
-func (w *writer) Write(p []byte) (n int, err error) {
-	if w.closed {
-		return 0, fmt.Errorf("already closed")
-	} else if w.committed {
-		return 0, fmt.Errorf("already committed")
-	} else if w.cancelled {
-		return 0, fmt.Errorf("already cancelled")
+		logger.Error("os.Stat:", err)
+		return err
 	}
 
-	if w.err != nil {
-		err = w.err
-		logrus.Errorln("debugkodo writer Write ", errorInfo(err))
-		return
-	}
+	fileSize := fileInfo.Size()
+	logger = logger.WithFields(logrus.Fields{
+		"fileSize":   fileSize,
+		"blockCount": storage.BlockCount(fileSize),
+	})
 
-	if w.rd == nil {
-		w.rd, w.wt = io.Pipe()
-		go w.background()
+	putExtra := storage.RputExtra{
+		Notify: func(blkIdx int, blkSize int, ret *storage.BlkputRet) {
+			logger.Infof("current upload: %d, %d", blkIdx, blkSize)
+		},
 	}
-	n, err = w.wt.Write(p)
+	ret := storage.PutRet{}
+
+	//设置kodo的reqid，不知道为啥reqid的key需要设置为0
+	//没有找到相关文档，我是直接从rpc的代码里找到的
+	kodoCtx := context.WithValue(ctx, 0, ctx.Value("trace.id"))
+	err = d.uploader.PutFile(kodoCtx, &ret, upToken, kodoKey, localFile, &putExtra)
 	if err != nil {
-		logrus.Errorln("debugkodo writer wt.Write ", errorInfo(err))
-		return
-	}
-	w.size += int64(n)
-	return
-}
-
-func (w *writer) Close() error {
-	if w.closed {
-		return fmt.Errorf("already closed")
-	}
-
-	w.close()
-	if w.err != nil {
-		logrus.Errorln("debugkodo writer close ", errorInfo(w.err))
-		return w.err
-	}
-
-	w.closed = true
-	return nil
-}
-
-// Size returns the number of bytes written to this FileWriter.
-func (w *writer) Size() int64 {
-	debugLog(fmt.Sprintf("getting size : %d %v", w.size, w.closed))
-	// if !w.closed {
-	// 	return w.size + w.bufferd
-	// }
-	return w.size
-}
-
-// Cancel removes any written content from this FileWriter.
-func (w *writer) Cancel() error {
-	if w.closed {
-		return fmt.Errorf("already closed")
-	} else if w.committed {
-		return fmt.Errorf("already committed")
-	}
-
-	w.close()
-
-	w.cancelled = true
-	err := w.Delete(w.ctx, w.path)
-	if err != nil {
-		logrus.Errorln("debugkodo writer cancel ", errorInfo(w.err))
+		logger.Error("PutFile:", err)
 	}
 	return err
 }
 
-// Commit flushes all content written to this FileWriter and makes it
-// available for future calls to StorageDriver./ and
-// StorageDriver.Reader.
-func (w *writer) Commit() error {
-	if w.closed {
-		return fmt.Errorf("already closed")
-	} else if w.committed {
-		return fmt.Errorf("already committed")
-	} else if w.cancelled {
-		return fmt.Errorf("already cancelled")
-	}
-
-	w.close()
-	if w.err != nil {
-		logrus.Errorln("debugkodo writer Commit ", errorInfo(w.err))
-		return w.err
-	}
-
-	w.committed = true
-	return nil
-}
-
-func (w *writer) close() {
-	debugLog(fmt.Sprintf("closing with size : %d", w.size))
-	if w.wt != nil {
-		w.wt.CloseWithError(io.EOF)
-		w.wt = nil
-		<-w.exitch
-		w.rd.CloseWithError(io.EOF)
-		w.rd = nil
-		close(w.exitch)
-	}
-}
-
-func debugLog(header string) {
-	// pc := make([]uintptr, 8, 8)
-	// cnt := runtime.Callers(1, pc)
-	logrus.Infoln(header)
-	// for i := 0; i < cnt; i++ {
-	// 	fu := runtime.FuncForPC(pc[i] - 1)
-
-	// 	file, line := fu.FileLine(pc[i] - 1)
-	// 	logrus.Infoln(fmt.Sprintf("%s:%d", filepath.Base(file), line))
-	// }
-	return
-}
-
-func (w *writer) background() {
-	key := w.getKey(w.path)
-	parts := make([]kodo.PutPart, 0, 2)
-
-	defer func() {
-		w.exitch <- struct{}{}
-		debugLog(fmt.Sprintf("background close, size : %d", w.size))
-	}()
-
-	if w.from > 0 {
-		parts = append(parts, kodo.PutPart{
-			Key:  key,
-			From: 0,
-			To:   w.from,
-		})
-	}
-
-	parts = append(parts, kodo.PutPart{
-		R: w.rd,
-	})
-
-	w.err = w.bucket.PutParts(w.ctx, nil, key, []string{key}, parts, nil)
-	if w.err != nil {
-		logrus.Warn("writer background PutParts:", key, errorInfo(w.err))
-		return
-	}
-
-	w.err = w.refreshCache(key)
-	if w.err != nil {
-		logrus.Warn("writer background refreshCache:", key, errorInfo(w.err))
-		return
-	}
+func (d *driver) kodoKey(path string) string {
+	return strings.TrimLeft(strings.TrimRight(d.params.RootDirectory, "/")+path, "/")
 }
 
 func isKeyNotExists(err error) bool {
@@ -705,15 +526,6 @@ func parseError(path string, err error) error {
 		return storagedriver.PathNotFoundError{Path: path, DriverName: driverName}
 	}
 	return err
-}
-
-func getParameter(parameters map[string]interface{}, key string) (value string) {
-	if v, ok := parameters[key]; !ok || v == nil {
-		return
-	} else {
-		value = fmt.Sprint(v)
-	}
-	return
 }
 
 func errorInfo(err error) string {
