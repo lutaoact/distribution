@@ -9,6 +9,7 @@ import (
 	"github.com/docker/distribution/context"
 	"github.com/docker/distribution/digest"
 	"github.com/docker/distribution/registry/storage/driver"
+	"github.com/Sirupsen/logrus"
 )
 
 // TODO(stevvooe): This should configurable in the future.
@@ -24,8 +25,12 @@ type blobServer struct {
 }
 
 func (bs *blobServer) ServeBlob(ctx context.Context, w http.ResponseWriter, r *http.Request, dgst digest.Digest) error {
+	logger := reqEntry(ctx).WithFields(logrus.Fields{
+		"digest": dgst, "func": "blobServer::ServeBlob",
+	})
 	desc, err := bs.statter.Stat(ctx, dgst)
 	if err != nil {
+		logger.Error("bs.statter.Stat error:", err)
 		return err
 	}
 

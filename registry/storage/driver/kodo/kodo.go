@@ -24,7 +24,6 @@ import (
 
 	"github.com/qiniu/api.v7/auth/qbox"
 	"github.com/qiniu/api.v7/storage"
-	"qiniupkg.com/x/rpc.v7"
 
 	"github.com/docker/distribution/context"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
@@ -180,7 +179,7 @@ func (d *driver) Reader(ctx context.Context, path string, offset int64) (io.Read
 		"path": path, "func": "Reader", "offset": offset,
 	})
 
-	privateAccessURL := d.privateURL(path)
+	privateAccessURL := d.privateURL(ctx, path)
 
 	// 转换为内网加速下载模式，这是kodo的黑科技
 	// 1. 将privateAccessURL中的域名部分替换为内网域名xsio.qiniu.io
@@ -220,6 +219,7 @@ func (d *driver) Reader(ctx context.Context, path string, offset int64) (io.Read
 		return nil, storagedriver.PathNotFoundError{Path: path, DriverName: driverName}
 	}
 
+	logger.Info("ok")
 	return resp.Body, nil
 }
 
@@ -243,6 +243,7 @@ func (d *driver) PutContent(ctx context.Context, path string, content []byte) er
 		logger.Error("io.Copy:", err)
 		return err
 	}
+	logger.Info("ok")
 	return writer.Commit()
 }
 
@@ -302,7 +303,7 @@ func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo,
 
 	entries, _, _, _, err := d.bucketManager.ListFiles(BUCKET, d.kodoKey(path), delimiter, marker, limit)
 	if err != nil {
-		logger.Error("ListFiles:", d.kodoKey(path), err)
+		logger.Error("ListFiles:", d.kodoKey(path), errorInfo(err))
 		return nil, err
 	}
 
@@ -324,6 +325,7 @@ func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo,
 		fi.Size = entry.Fsize
 		fi.ModTime = time.Unix(0, entry.PutTime*100)
 	}
+	logger.WithField("entry.Key", entry.Key).Info("ok")
 
 	return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
 }
@@ -361,8 +363,8 @@ func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 		entries, prefixes, nextMarker, hasNext, err := d.bucketManager.ListFiles(BUCKET, d.kodoKey(path), delimiter, marker, limit)
 
 		if err != nil {
-			logger.Error("bucketManager.ListFiles:", d.kodoKey(path), err)
-			return nil, err
+			logger.Error("bucketManager.ListFiles:", d.kodoKey(path), errorInfo(err))
+			return nil, parseError(d.kodoKey(path), err)
 		}
 
 		for _, entry := range entries {
@@ -404,8 +406,10 @@ func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) e
 	err := d.bucketManager.Move(bucket, d.kodoKey(sourcePath), bucket, d.kodoKey(destPath), true)
 	if err != nil {
 		logger.Error("debugkodo Move:", errorInfo(err))
+		return parseError(sourcePath, err)
 	}
-	return parseError(sourcePath, err)
+	logger.Info("ok")
+	return nil
 }
 
 // Delete recursively deletes all objects stored at "path" and its subpaths.
@@ -437,7 +441,7 @@ func (d *driver) Delete(ctx context.Context, path string) error {
 					logger.Error("Delete:", d.kodoKey(path), " does not exist")
 					continue
 				}
-				logger.Error("Delete:", d.kodoKey(path), err)
+				logger.Error("Delete:", d.kodoKey(path), " "+errorInfo(err))
 				return err
 			}
 		}
@@ -449,6 +453,7 @@ func (d *driver) Delete(ctx context.Context, path string) error {
 		}
 	}
 
+	logger.Info("ok")
 	return nil
 }
 
@@ -458,14 +463,18 @@ func (d *driver) Delete(ctx context.Context, path string) error {
 // implementations.
 func (d *driver) URLFor(ctx context.Context, path string, options map[string]interface{}) (string, error) {
 	fmt.Printf("options = %+v\n", options)
-	return d.privateURL(path), nil
+	return d.privateURL(ctx, path), nil
 }
 
-func (d *driver) privateURL(path string) string {
+func (d *driver) privateURL(ctx context.Context, path string) string {
 	domain := d.params.BaseURL
 	key := d.kodoKey(path)
 	deadline := time.Now().Add(time.Second * 3600 * 3).Unix() //3小时有效期
 	privateAccessURL := storage.MakePrivateURL(mac, domain, key, deadline)
+
+	ReqEntry(ctx).WithFields(logrus.Fields{
+		"privateURL": privateAccessURL, "func": "privateURL", "path": path,
+	}).Info()
 
 	return privateAccessURL
 }
@@ -515,21 +524,21 @@ func (d *driver) kodoKey(path string) string {
 }
 
 func isKeyNotExists(err error) bool {
-	if er, ok := err.(*rpc.ErrorInfo); ok && er.Code == 612 {
+	if er, ok := err.(*storage.ErrorInfo); ok && er.Code == 612 {
 		return true
 	}
 	return false
 }
 
 func parseError(path string, err error) error {
-	if er, ok := err.(*rpc.ErrorInfo); ok && er.Code == 612 {
+	if er, ok := err.(*storage.ErrorInfo); ok && er.Code == 612 {
 		return storagedriver.PathNotFoundError{Path: path, DriverName: driverName}
 	}
 	return err
 }
 
 func errorInfo(err error) string {
-	if err1, ok := err.(*rpc.ErrorInfo); ok {
+	if err1, ok := err.(*storage.ErrorInfo); ok {
 		return err1.ErrorDetail()
 	}
 	return err.Error()

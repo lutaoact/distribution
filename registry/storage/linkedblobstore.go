@@ -12,6 +12,7 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/uuid"
+	"github.com/Sirupsen/logrus"
 )
 
 // linkPathFunc describes a function that can resolve a link based on the
@@ -68,8 +69,12 @@ func (lbs *linkedBlobStore) Open(ctx context.Context, dgst digest.Digest) (distr
 }
 
 func (lbs *linkedBlobStore) ServeBlob(ctx context.Context, w http.ResponseWriter, r *http.Request, dgst digest.Digest) error {
+	logger := reqEntry(ctx).WithFields(logrus.Fields{
+		"digest": dgst, "func": "linkedBlobStore::ServeBlob",
+	})
 	canonical, err := lbs.Stat(ctx, dgst) // access check
 	if err != nil {
+		logger.Error("lbs.Stat error: ", err)
 		return err
 	}
 
@@ -381,6 +386,9 @@ type linkedBlobStatter struct {
 var _ distribution.BlobDescriptorService = &linkedBlobStatter{}
 
 func (lbs *linkedBlobStatter) Stat(ctx context.Context, dgst digest.Digest) (distribution.Descriptor, error) {
+	logger := reqEntry(ctx).WithFields(logrus.Fields{
+		"digest": dgst, "func": "linkedBlobStatter::Stat",
+	})
 	var (
 		found  bool
 		target digest.Digest
@@ -406,6 +414,7 @@ func (lbs *linkedBlobStatter) Stat(ctx context.Context, dgst digest.Digest) (dis
 	}
 
 	if !found {
+		logger.Error("LinkPath not found")
 		return distribution.Descriptor{}, distribution.ErrBlobUnknown
 	}
 
