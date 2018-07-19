@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/context"
@@ -57,18 +56,7 @@ type blobHandler struct {
 func (bh *blobHandler) GetBlob(w http.ResponseWriter, r *http.Request) {
 	context.GetLogger(bh).Debug("GetBlob")
 	blobs := bh.Repository.Blobs(bh)
-	// add by wanglei, add a chance for retrying {
-	var err error
-	var desc distribution.Descriptor
-	for i := 0; i < 2; i++ {
-		desc, err = blobs.Stat(bh, bh.Digest)
-		if err == nil {
-			break
-		}
-		time.Sleep(time.Millisecond * 500)
-		context.GetLogger(bh).Info("GetBlob Retry Triggered")
-	}
-	// add by wanglei, add a chance for retrying }
+	desc, err := blobs.Stat(bh, bh.Digest)
 	if err != nil {
 		if err == distribution.ErrBlobUnknown {
 			bh.Errors = append(bh.Errors, v2.ErrorCodeBlobUnknown.WithDetail(bh.Digest))
@@ -79,7 +67,7 @@ func (bh *blobHandler) GetBlob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := blobs.ServeBlob(bh, w, r, desc.Digest); err != nil {
-		context.GetLogger(bh).Debugf("unexpected error getting blob HTTP handler: %v", err)
+		context.GetLogger(bh).Errorf("unexpected error getting blob HTTP handler: %v", err)
 		bh.Errors = append(bh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
 		return
 	}

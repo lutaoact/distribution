@@ -5,6 +5,7 @@ import (
 	"github.com/docker/distribution/digest"
 
 	"github.com/docker/distribution"
+	"github.com/Sirupsen/logrus"
 )
 
 // Metrics is used to hold metric counters
@@ -50,8 +51,12 @@ func NewCachedBlobStatterWithMetrics(cache distribution.BlobDescriptorService, b
 }
 
 func (cbds *cachedBlobStatter) Stat(ctx context.Context, dgst digest.Digest) (distribution.Descriptor, error) {
+	logger := reqEntry(ctx).WithFields(logrus.Fields{
+		"digest": dgst, "func": "cachedBlobStatter::Stat",
+	})
 	desc, err := cbds.cache.Stat(ctx, dgst)
 	if err != nil {
+		logger.Error("cbds.cache.Stat error:", err)
 		if err != distribution.ErrBlobUnknown {
 			context.GetLogger(ctx).Errorf("error retrieving descriptor from cache: %v", err)
 		}
@@ -69,6 +74,7 @@ fallback:
 	}
 	desc, err = cbds.backend.Stat(ctx, dgst)
 	if err != nil {
+		logger.Error("cbds.backend.Stat error:", err)
 		return desc, err
 	}
 
